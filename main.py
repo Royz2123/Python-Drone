@@ -74,403 +74,8 @@ viz_mode = True
 # debug_mode logs everything
 debug_mode = True
 
-class StepVizData(object):
-    displayed_step = 0
-    current_step = -1
-    vizMat                                    # TODO: define as a cv.Mat (np.array)
 
-class GUI(object):
-    def __init__(self):
-        # fps calculations
-        self._frames = 0                        # number of frames
-        self._start = cv.getTickCount()         # set start tickcount
-        self._freq = cv.getTickFrequency()      # set tick frequency
-        self._capture_length = self._freq / 10
 
-        self._main_window = ""
-
-    def show_frame_rate(self):
-    	self._freq = static_cast<int>(cv.getTickFrequency())
-    	self._captureLength = self._freq / 10
-
-        # move onto next frame
-    	self._frames++
-
-        # current tick count
-    	curr = cv.getTickCount()
-
-    	if (curr - start) >= captureLength:
-    		fps = frames * (freq / (curr - start))
-            if VIZStepFunction:
-    			cv.setWindowTitle(window, str(fps))
-            print("FPS:\t" % fps)
-    		self._start = curr
-            self._frames = 0
-
-    def ortho_project(point, camera_matrix):
-    	point = camera_matrix * point
-    	return Point2i{(int)point.x, (int)point.z}
-
-    def drawViewOrthographicXZ(
-		screenBuffer,
-		size,
-		name,
-		droneTransform,
-		droneTarget,
-		droneControlErrors,
-		transform,
-		drawPlaneIcon=False
-    ):
-    	screenBuffer.create(size.height, size.width, CV_8UC3)
-    	screenBuffer.setTo(Scalar{51, 51, 51})
-
-    	Point3f xBegin{-100 * 1000, 0, 0}
-    	Point3f xEnd = -xBegin
-    	Point3f yBegin{0, -100 * 1000, 0}
-    	Point3f yEnd = -yBegin
-    	Point3f zBegin{0, 0, -100 * 1000}
-    	Point3f zEnd = -zBegin
-
-    	Scalar axesColor{242, 158, 106}
-
-    	cv.line(screenBuffer, orthoProject(xBegin, transform), orthoProject(xEnd, transform), axesColor)
-    	cv.line(screenBuffer, orthoProject(yBegin, transform), orthoProject(yEnd, transform), axesColor)
-    	cv.line(screenBuffer, orthoProject(zBegin, transform), orthoProject(zEnd, transform), axesColor)
-
-    	Point2i planePosition = orthoProject(droneTransform.translation(), transform)
-    	cv.circle(screenBuffer, planePosition, 3, Scalar{255, 255, 255}, 2)
-
-
-    	cv.putText(screenBuffer, name, {size.width - 50, 27}, cv.FONT_HERSHEY_PLAIN, 1, axesColor)
-
-    	if (drawPlaneIcon) {
-    		Mat currRotation{droneTransform.rotation()}
-
-    		float planeRotation = rotationYaw(Mat{droneTransform.rotation()})
-
-    		# http:#www.challengers101.com/images/CompRose1.jpg
-    		vector<Point2i> planeIconHalf1 = {
-    			{0,  -141},
-    			{0,  -108},
-    			{9,  -90},
-    			{12, -71},
-    			{14, -53},
-    			{75, 6},
-    			{76, 13},
-    			{75, 26},
-    			{12, -6},
-    			{9,  49},
-    			{30, 71},
-    			{33, 80},
-    			{31, 89},
-    			{4,  76},
-    			{0,  82},
-    		}
-
-    		vector<Point2i> planeIconHalf2 = planeIconHalf1
-    		std.reverse(planeIconHalf2.begin(), planeIconHalf2.end())
-
-    		for (auto &p : planeIconHalf2) {
-    			p = Point2i{-p.x, p.y}
-    		}
-
-    		vector<Point2i> planeIcon = planeIconHalf1
-    		planeIcon.insert(planeIcon.begin(), planeIconHalf2.begin(), planeIconHalf2.end())
-
-    		for (auto &p : planeIcon) {
-    			float cosT = std.cos(planeRotation)
-    			float sinT = std.sin(planeRotation)
-    			p = Point2i{(int)(p.x * cosT - p.y * sinT), (int)(p.x * sinT + p.y * cosT)}
-
-    			p /= 2
-    			p += planePosition
-    		}
-
-    		vector<vector<Point2i>> planeIconWrapper = {planeIcon}
-
-    		cv.polylines(screenBuffer, planeIconWrapper, False, Scalar{255, 255, 255})
-    	}
-
-    	Point2i droneTargetPosition = orthoProject(droneTarget, transform)
-    	int rectSide = 10
-    	cv.rectangle(screenBuffer, Rect2i{droneTargetPosition.x - rectSide / 2, droneTargetPosition.y - rectSide / 2, rectSide, rectSide}, Scalar{66, 66, 244}, 2)
-
-    	Point3f controlErrors{droneControlErrors[0], droneControlErrors[1], -droneControlErrors[2]}
-    	#controlErrors2D = droneTransform * controlErrors
-
-    	Point2i dronePosition = orthoProject(droneTransform.translation(), transform)
-    	Point2i shiftedControlErrors = orthoProject(droneTransform * controlErrors, transform)
-    	cv.arrowedLine(screenBuffer, dronePosition, shiftedControlErrors, Scalar{66, 66, 244}, 2)
-    }
-
-    def drawFlightViz(
-        screenBuffer,
-		cameraFeed,
-		droneTransform,
-		frameRate,
-		droneTarget,
-		droneControlErrors,
-		flightModeOn
-    ):
-    	Mat q1, q2, q3, q4
-
-    	q1 = cameraFeed
-
-    	Rect2i panelSize{0, 0, q1.cols, q1.rows}
-
-    	Mat rotationTop = (cv.Mat_<float>(3, 3) <<
-    		1, 0, 0,
-    		0, 1, 0,
-    		0, 0, 1)
-    	float scaleTop = 1
-    	Vec3f shiftTop{(float)panelSize.width / 2, 0, (float)panelSize.height / 2}
-
-    	Mat rotationBack = (cv.Mat_<float>(3, 3) <<
-    		1, 0, 0,
-    		0, 0, 1,
-    		0, -1, 0)
-    	float scaleBack = 1
-    	Vec3f shiftBack{(float)panelSize.width / 2, 0, (float)panelSize.height * 3 / 4}
-
-    	Mat rotationLeft = (cv.Mat_<float>(3, 3) <<
-    		0, 0, 1,
-    		1, 0, 0,
-    		0, -1, 0)
-    	float scaleLeft = 1
-    	Vec3f shiftLeft{(float)panelSize.width / 2, 0, (float)panelSize.height * 3 / 4}
-
-    	drawViewOrthographicXZ(q2, panelSize.size(), "TOP" , droneTransform, DRONE_TARGET, droneControlErrors, Affine3f{rotationTop * scaleTop, shiftTop}, True)
-    	drawViewOrthographicXZ(q3, panelSize.size(), "LEFT", droneTransform, DRONE_TARGET, droneControlErrors, Affine3f{rotationLeft * scaleLeft, shiftLeft})
-    	drawViewOrthographicXZ(q4, panelSize.size(), "BACK", droneTransform, DRONE_TARGET, droneControlErrors, Affine3f{rotationBack * scaleBack, shiftBack})
-
-    	if (!flightModeOn) {
-    		auto text = "Flight Mode OFF. Press X to begin flight."
-    		auto font = cv.FONT_HERSHEY_SIMPLEX
-    		auto fontScale = 0.65
-    		auto thickness = 2
-
-    		int tmpBaseline
-    		Size textSize = cv.getTextSize(text, font, fontScale, thickness, &tmpBaseline)
-
-    		cv.putText(q2,
-    				text, Point{(q2.cols - textSize.width) / 2, 20 + textSize.height},
-    				font, fontScale, Scalar{0, 0, 255}, thickness)
-    	}
-
-    	Size2i totalSize{panelSize.width * 2 + 1, panelSize.height * 2 + 1}
-
-    	screenBuffer.create(totalSize, CV_8UC3)
-    	screenBuffer.setTo(Scalar{255, 255, 255})
-
-    	q1.copyTo(Mat{screenBuffer, Rect2i{0, 0, panelSize.width, panelSize.height}})
-    	q2.copyTo(Mat{screenBuffer, Rect2i{panelSize.width + 1, 0, panelSize.width, panelSize.height}})
-    	q3.copyTo(Mat{screenBuffer, Rect2i{0, panelSize.height + 1, panelSize.width, panelSize.height}})
-    	q4.copyTo(Mat{screenBuffer, Rect2i{panelSize.width + 1, panelSize.height + 1, panelSize.width, panelSize.height}})
-    }
-
-
-
-# class for debugging purposes
-class Debug(object):
-    # static time variables
-    last = cv.getTickCount()
-    freq = cv.getTickFrequency()
-
-    @staticmethod
-    def debug(msg):
-        if debug_mode:
-            print("%f: %s" % (
-                cv.getTickCount(),
-                masg
-            ))
-
-    @staticmethod
-    def debug_time_spent(msg):
-        if debug_mode:
-        	curr = cv.getTickCount()
-            print("%.2f:\t%s" % (
-                float(curr - last) / freq * 1000,
-                msg
-            ))
-        	last = curr
-
-
-# Image processing techniques
-# relies heavily on OpenCV
-class ImageProcessing(object):
-    @staticmethod
-    def binarizeImageInv(src, dst):
-    	Debug.debug("Entered binarizeImageInv")
-
-    	dst = src.clone()
-
-    	if dst.type() == cv.CV_8UC3:
-    		cv.cvtColor(dst, dst, CV_BGR2GRAY)
-
-    	CV_Assert(image.type() == CV_8U)
-
-    	Debug.debug("Clone, convert and assert")
-
-    	#cv.blur(image, image, Size{4, 4})
-
-    	Debug.debug("Blur")
-
-    	#double minColor
-    	#cv.minMaxIdx(image, &minColor)
-    	#cv.threshold(image, image, minColor + 50, 255, cv.CV_THRESH_BINARY_INV)
-
-    	meanColor = cv.mean(dst)[0]
-    	cv.threshold(dst, dst, meanColor - 30, 255, cv.CV_THRESH_BINARY_INV)
-
-    	Debug.debug("Threshold")
-
-    	#cv.threshold(image, image, 0, 255, CV_THRESH_OTSU)
-    	#cv.bitwise_not(image, image)
-
-    	#cv.morphologyEx(image,
-    	#		image,
-    	#		cv.MORPH_CLOSE,
-    	#		cv.getStructuringElement(cv.MORPH_ELLIPSE, Size{7, 7}))
-
-    	Debug.debug("morphologyEx close")
-
-    	#cv.morphologyEx(image,
-    	#		image,
-    	#		cv.MORPH_OPEN,
-    	#		cv.getStructuringElement(cv.MORPH_ELLIPSE, Size{7, 7}))
-
-    	Debug.debug("morphologyEx open")
-
-        if viz_mode:
-            stepViz = dstc.clone()
-
-    	Debug.debug("Finish binarizeImageInv")
-
-    #                     ####
-    # Finds the pattern:  #  #  in the image.
-    #                    #  #
-    def find_open_square(image, square):
-    	Debug.debug("Entered findOpenSquare")
-    	square.resize(0)
-
-    	binarizeImageInv(image, image)
-
-    	#
-    	# Find the contours
-    	#
-
-    	vector<vector<Point2i>> contours
-
-    	{
-    		Mat imageCopy = image.clone()
-
-    		cv.findContours(imageCopy,
-    				contours,
-    				cv.noArray(),
-    				CV_RETR_LIST,
-    				CV_CHAIN_APPROX_NONE)
-    	}
-
-    	Debug.debug("Find conturs")
-
-    	if (contours.size() == 0) {
-    		return False
-    	}
-
-    	#
-    	# Select contour with largest area
-    	#
-
-    	int largestContourIndex = -1
-
-    	{
-    		double maxArea = -1
-
-    		for (int i = 0 i < (int)contours.size() i++) {
-    			double currArea = cv.contourArea(contours[i])
-
-    			if (currArea > maxArea) {
-    				maxArea = currArea
-    				largestContourIndex = i
-    			}
-    		}
-    	}
-
-    	Debug.debug("Largest Area")
-
-    	vector<Point2i> chosenContour = contours[largestContourIndex]
-
-    	VIZ_STEP
-    	{
-    		StepVizData.vizMat = Mat.zeros(image.size(), CV_8U)
-
-    		cv.drawContours(StepVizData.vizMat, contours, largestContourIndex, 255, -1)
-    	}
-
-    	#
-    	# Find bounding square
-    	#
-
-    	cv.RotatedRect boundingRect = cv.minAreaRect(chosenContour)
-    	auto size = boundingRect.size
-    	boundingRect.size.width = boundingRect.size.height = (size.width + size.height) / 2
-    	square.resize(4)
-    	boundingRect.points(&square[0])
-
-    	Debug.debug("Find Bounding square")
-
-    	#
-    	# Reorder square points into CW order
-    	#
-
-    	Point2f centroid = (square[0] + square[1] + square[2] + square[3]) / 4
-
-    	std.sort(square.begin(),
-    			square.end(),
-    			[centroid](const Point2f &p1, const Point2f &p2) {
-    			Point2f v1 = p1 - centroid
-    			Point2f v2 = p2 - centroid
-    			return std.atan2(-v1.y, v1.x) > std.atan2(-v2.y, v2.x)
-    			})
-
-    	Debug.debug("Reorder points")
-
-    	#
-    	# Find the missing edge.
-    	# The missing edge is the edge whose midpoint
-    	# is farther from any contour point than the midpint
-    	# of any other edge.
-    	#
-
-    	float maxMinDistance = -1
-    	int maxMinDistanceIndex = -1
-
-    	for (unsigned int i = 0 i < square.size() i++) {
-    		Point2f edgeCenter = (square[i] + square[(i + 1) % square.size()]) / 2
-
-    		float currMinDistance = FLT_MAX
-
-    		for (unsigned int k = 0 k < chosenContour.size() k++) {
-    			float dx = edgeCenter.x - chosenContour[k].x
-    			float dy = edgeCenter.y - chosenContour[k].y
-
-    			float sqrDist = dx * dx + dy * dy
-
-    			currMinDistance = std.min(currMinDistance, sqrDist)
-    		}
-
-    		if (currMinDistance > maxMinDistance) {
-    			maxMinDistance = currMinDistance
-    			maxMinDistanceIndex = i
-    		}
-    	}
-
-    	std.rotate(square.begin(), square.begin() + (maxMinDistanceIndex + 1) % square.size(), square.end())
-
-    	Debug.debug("Find missing edge and finish findOpenSquare")
-
-    	return True
-    }
 
 
 
@@ -505,39 +110,6 @@ def calculateControlErrors(currPos, currRotation, targetPos):
 		0 - yawCW
     ]
 	return errors
-
-class Channel(object):
-    def __init__(self, min_val, zero_val, max_val):
-    	self._min = min_val
-    	self._zero = zero_val
-    	self._max = max_val
-
-
-    # Linear interpolation (continuation)
-    @staticmethod
-    def lerp(t, a, b):
-        return int((1-t)*a + t*b)
-
-    def to_channel(self, value):
-        if value >= 0:
-            return Channel.lerp(value, self._zero, self._max)
-        else:
-            return Channel.lerp(-value, self._zero, self._min)
-
-
-def controls_to_channels(input_vec):
-    Channel right_channel = Channel(127-30, 64, 30)
-    Channel forward_channel = Channel(0+30, 64, 127-30)
-    Channel up_channel = Channel(10, 58, 127)
-    Channel rotate_channel = Channel(127, 64, 0)
-
-    # Note: order isn't a mistake! changed on purpose
-    return [
-        right_channel.to_channel(input_vec[0]),
-    	forward_channel.to_channel(input_vec[2]),
-        up_channel.to_channel(input_vec[1]),
-    	rotation_channel.to_hannel(input_vec[3])
-    ]
 
 
 def trackbar_action(value, coeffs, name):
@@ -653,19 +225,19 @@ def main():
 	VideoCapture cap
 
 	if berryMode:
-		Debug.debug("Opening Camera")
+		logging.Debug.debug("Opening Camera")
 		piCap.set( CV_CAP_PROP_FORMAT, CV_8UC1 )
 		piCap.set( CV_CAP_PROP_FRAME_WIDTH, 320 )
 		piCap.set( CV_CAP_PROP_FRAME_HEIGHT, 240 )
 
 		if not piCap.open():
-            Debug.debug("Error opening the camera")
+            logging.Debug.debug("Error opening the camera")
 			return -1
 	else:
 		cap.open(cameraIndex)
 
 		if not cap.isOpened():
-            Debug.debug("Error opening the camera: %d" % cameraIndex)
+            logging.Debug.debug("Error opening the camera: %d" % cameraIndex)
 			return -1
 
 		cap.set(cv.CAP_PROP_FPS, 60)
@@ -684,7 +256,7 @@ def main():
 	pressedKey = 0
 
 	while (pressedKey != 'q') {
-		Debug.debug("************** Entered Loop *****************")
+		logging.Debug.debug("************** Entered Loop *****************")
 		if (!paused) {
 			if(berryMode):
 				piCap.grab()
@@ -692,12 +264,12 @@ def main():
 			else:
 				cap >> frame
 
-			Debug.debug("Photo grabing")
+			logging.Debug.debug("Photo grabing")
 
 			if scaleFactor != 1.0:
 				resize(frame, frame, Size(), scaleFactor, scaleFactor, cv.INTER_NEAREST)
 
-			Debug.debug("Resizing")
+			logging.Debug.debug("Resizing")
 
 			if txMode:
 
@@ -718,17 +290,17 @@ def main():
 				const int horizontalAndVertical = -1
 				cv.flip(frame, frame, horizontalAndVertical)
 
-			Debug.debug("TX Mode")
+			logging.Debug.debug("TX Mode")
 
         if viz_mode:
             stepViz = frame.clone()
 
-		Debug.debug("StepVizData.vizMat clone")
+		logging.Debug.debug("StepVizData.vizMat clone")
 
 		deltaTime = float(cv.getTickCount() - last_frame_tick_count) / cv.getTickFrequency()
 		last_frame_tick_count = cv.getTickCount()
 
-		Debug.debug("Time since last frame tick count")
+		logging.Debug.debug("Time since last frame tick count")
 
 		found = ImageProcessing.find_open_square(frame, cameraSquare)
 
@@ -745,10 +317,10 @@ def main():
 			}
 		}
 
-		Debug.debug("Tracking OpenSquare section")
+		logging.Debug.debug("Tracking OpenSquare section")
 
 		if not found:
-		    Debug.debug("Square not found")
+		    logging.Debug.debug("Square not found")
         else:
 			rvec, tvec = cv.solvePnP(
                 WORLD_SQUARE,
@@ -756,7 +328,7 @@ def main():
 				camera_matrix,
 			)
 
-			Debug.debug("SolvePnP")
+			logging.Debug.debug("SolvePnP")
 
 			rvec.convertTo(rvec, CV_32F)
 			tvec.convertTo(tvec, CV_32F)
@@ -772,7 +344,7 @@ def main():
 
 			droneTransform.translation(smoothPosition)
 
-        Debug.debug("found Position")
+        logging.Debug.debug("found Position")
 
         # update controller coefficients based on trackbar
         for index, axis in enumerate(["xz", "y", "xz", "r"]):
@@ -787,7 +359,7 @@ def main():
             DRONE_TARGET
         )
 
-		Debug.debug("PID")
+		logging.Debug.debug("PID")
 
         # set pid controls
         pid_control = [0, 0, 0, 0]
@@ -795,7 +367,7 @@ def main():
 			for i in range(4):
 				pid_control.append(pid_controllers[i].calculate(controlErrors[i], deltaTime))
 
-		Debug.debug("Take off and Landing")
+		logging.Debug.debug("Take off and Landing")
 
 		channel_controls = controls_to_drone_channels(pid_control)
 		if !flightModeOn:
@@ -819,12 +391,12 @@ def main():
                 )
 
 			if not success:
-                Debug.debug("Failed to send to Arduino")
-			Debug.debug("Send drone actions")
+                logging.Debug.debug("Failed to send to Arduino")
+			logging.Debug.debug("Send drone actions")
 		}
 
 
-		Debug.debug("Control errors to console")
+		logging.Debug.debug("Control errors to console")
 
 		#
 		# Draw GUI
@@ -848,13 +420,13 @@ def main():
 
 			cv.imshow("w", displayedFrame)
 			showFrameRateInTitle("w")
-		Debug.debug("Draw GUI")
+		logging.Debug.debug("Draw GUI")
 
 		pressedKey = cv.waitKey(1)
 
 		#std.cout << pressedKey << std.endl
 
-		Debug.debug("cv.waitKey(1)")
+		logging.Debug.debug("cv.waitKey(1)")
 
 		if pressedKey == ' ' :
 			paused = !paused
@@ -864,7 +436,7 @@ def main():
 			for pid in pid_controllers:
 				pid._scaled_error_sum = 0
 
-		Debug.debug("User Commands")
+		logging.Debug.debug("User Commands")
 
 		#
 		# Prepare StepViz for next cycle
