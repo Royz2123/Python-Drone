@@ -1,3 +1,13 @@
+#
+# Written by Roy Zohar, 2017.
+# Published under the MIT license.
+#
+
+import cv2 as cv
+import numpy as np
+
+import logging
+
 class Channel(object):
     def __init__(self, min_val, zero_val, max_val):
     	self._min = min_val

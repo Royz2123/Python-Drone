@@ -1,4 +1,10 @@
+#
+# Written by Roy Zohar, 2017.
+# Published under the MIT license.
+#
+
 import cv2 as cv
+import numpy as np
 
 # class for debugging purposes
 class Debug(object):

@@ -3,20 +3,18 @@
 # Published under the MIT license.
 #
 
-import os
 import cv2 as cv
+import numpy as np
 
+import channels
+import logging
+import pid
+import quad_serial
+import image_processing
+import viz
 
 # Raspberry Camera module, not completely necessary
 # include <raspicam/raspicam_cv.h>
-
-
-import pid
-import quad_serial
-
-# frequent colors
-RED = np.array([66, 66, 244])
-GREEN = np.array([66, 244, 66])
 
 # important keys
 ARROW_LEFT = 65361
@@ -59,25 +57,16 @@ WORLD_SQUARE = [
 DRONE_TARGET = [WORLD_SQUARE_SIZE, 160, -WORLD_SQUARE_SIZE]
 
 
-#define QQQ do {std.cerr << "QQQ " << __FUNCTION__ << " " << __LINE__ << std.endl} while(0)
-
-#define VIZ_STEP if (++stepViz.currentStep == stepViz.displayed_step && VIZStepFunction)
-
-#define StepVizData.vizMat stepViz.vizMat
-
+# DEBUGGING constants
 #
 # viz_mode is cloning frames rapidly,
 # Note: Heavy for the raspberry.
 #
-viz_mode = True
+viz.GUI.viz_mode = True
+viz.GUI.config_mode = True
 
 # debug_mode logs everything
-debug_mode = True
-
-
-
-
-
+logging.Debug.debug_mode = True
 
 
 def rotationYaw(rotation):
@@ -89,7 +78,6 @@ def rotationYaw(rotation):
 	yawCCW = std.atan2(atanY, atanX)
 
 	return -yawCCW
-
 
 
 def calculateControlErrors(currPos, currRotation, targetPos):
@@ -110,16 +98,6 @@ def calculateControlErrors(currPos, currRotation, targetPos):
 		0 - yawCW
     ]
 	return errors
-
-
-def trackbar_action(value, coeffs, name):
-    if name == "smoothing":
-        # update the somothing factor
-        coeffs["smoothing"] = value
-    else:
-        # update the trackbars for the pid
-        axis, pid_name = name.split(' ')
-        coeffs["pid"][axis][pid_name] = value
 
 
 def is_number(s):
@@ -160,14 +138,8 @@ def main():
 	#
 	scaleFactor = 1.0
 
-	#
-	# Sometimes we don't want to create this window.
-	#
-	config_mode = True
-
     # create a quad serial object
-	quad_serial.QuadSerial serial
-	serial.openDefault()
+	serial = quad_serial.QuadSerial()
 
 	pid_controllers = [
 		pid.Pid(0.04, 0, 0),
@@ -186,67 +158,26 @@ def main():
 
 	cameraIndex = 0
 
+    # handle arguments
 	for arg in sys.argv[1:]:
 		if arg == "-ngui":
-			viz_mode = False
+			viz.GUI.viz_mode = False
 		elif temp == "-pi":
 			berryMode = True
 		elif temp == "-nconfig":
-			config_mode = False
+			viz.GUI.config_mode = False
 		elif is_number(temp):
             cameraIndex = int(temp)
 
-	if config_mode:
-		cv.namedWindow("config", cv.WINDOW_NORMAL)
+    viz.GUI.create_trackbars()
 
-        # create trackbars for pid
-        for axis_name, pid in coeffs["pid"].items():
-            for pid_name, pid_val in pid.items():
-                trackbar_name = "%s %s" % (axis, pid_name)
-                cv.createTrackbar(
-                    trackbar_name,
-                    "config",
-                    curr_val,
-                    100,
-                    lambda x: trackbar_action(x, coeffs, trackbar_name)
-                )
-
-        # create trackbar for smoothing factor
-		cv.createTrackbar(
-            "Smoothing factor",
-            "config",
-            coeffs["smoothing"],
-            100,
-            lambda x: trackbar_action(x, coeffs, "smoothing")
-        )
-	}
-
-	raspicam.RaspiCam_Cv piCap
-	VideoCapture cap
-
-	if berryMode:
-		logging.Debug.debug("Opening Camera")
-		piCap.set( CV_CAP_PROP_FORMAT, CV_8UC1 )
-		piCap.set( CV_CAP_PROP_FRAME_WIDTH, 320 )
-		piCap.set( CV_CAP_PROP_FRAME_HEIGHT, 240 )
-
-		if not piCap.open():
-            logging.Debug.debug("Error opening the camera")
-			return -1
-	else:
-		cap.open(cameraIndex)
-
-		if not cap.isOpened():
-            logging.Debug.debug("Error opening the camera: %d" % cameraIndex)
-			return -1
-
-		cap.set(cv.CAP_PROP_FPS, 60)
+	cap = cv.VideoCapture(cameraIndex)
 
 	frame = np.array([])
 	camera_matrix = PI_CAMERA_MAT
 
 	cameraSquare = np.zeros(3)
-    droneTransform = np.zeros(3)
+    drone_transform = np.zeros(3)
 	smoothPosition = np.zeros(3)
 
 	last_frame_tick_count = 0
@@ -255,14 +186,12 @@ def main():
 	paused = False
 	pressedKey = 0
 
-	while (pressedKey != 'q') {
+	while pressedKey != 'q':
 		logging.Debug.debug("************** Entered Loop *****************")
-		if (!paused) {
-			if(berryMode):
-				piCap.grab()
-				piCap.retrieve(frame)
-			else:
-				cap >> frame
+		if not paused:
+            ret, frame = cap.read()
+            if ret is None:
+                break
 
 			logging.Debug.debug("Photo grabing")
 
@@ -271,55 +200,26 @@ def main():
 
 			logging.Debug.debug("Resizing")
 
+            # TX image processing
 			if txMode:
-
-				#
-				# Deinterlace and flip
-				#
-
-				# TODO: Do solve PnP in the original frame
-
-				frame = frame(Range{5, frame.rows}, Range{0, frame.cols - 7})
-
-				# NOTE(Andrey): From experiments we found the odd lines are
-				# more recent in both TX05 and TX03.
-
+				frame = frame[5:, :-7]
 				for i in range(0, frame.rows - 1, 2):
 					frame.row(i + 1).copyTo(frame.row(i))
-
-				const int horizontalAndVertical = -1
-				cv.flip(frame, frame, horizontalAndVertical)
+				cv.flip(frame, frame, -1)
 
 			logging.Debug.debug("TX Mode")
-
-        if viz_mode:
-            stepViz = frame.clone()
-
-		logging.Debug.debug("StepVizData.vizMat clone")
 
 		deltaTime = float(cv.getTickCount() - last_frame_tick_count) / cv.getTickFrequency()
 		last_frame_tick_count = cv.getTickCount()
 
 		logging.Debug.debug("Time since last frame tick count")
 
-		found = ImageProcessing.find_open_square(frame, cameraSquare)
-
-		if viz_mode:
-			StepVizData.vizMat = frame.clone()
-			for i in range(cameraSquare.size()){
-				cv.line(
-                    StepVizData.vizMat,
-                    cameraSquare[i],
-                    cameraSquare[(i + 1) % cameraSquare.size()],
-                    RED if (i == cameraSquare.size() - 1) else GREEN,
-                    3
-                )
-			}
-		}
+		camera_square = ImageProcessing.find_open_square(frame)
+        viz.GUI.draw_square(frame, cameraSquare)
 
 		logging.Debug.debug("Tracking OpenSquare section")
 
-		if not found:
+		if camera_square is None:
 		    logging.Debug.debug("Square not found")
         else:
 			rvec, tvec = cv.solvePnP(
@@ -332,17 +232,17 @@ def main():
 
 			rvec.convertTo(rvec, CV_32F)
 			tvec.convertTo(tvec, CV_32F)
-			Affine3f cameraTransform = Affine3f{rvec, tvec}
+			Affine3f camera_transform = Affine3f{rvec, tvec}
 			# The square doesn't move, we are moving.
-			cameraTransform = cameraTransform.inv()
+			camera_transform = camera_transform.inv()
 
 			# We found the camera, but we want to find the drone
-			droneTransform = cameraTransform * invDroneCameraTransform
+			drone_transform = camera_transform * INV_DRONE_CAMERA_TRANSFORM
 
-			pos = droneTransform.translation()
+			pos = drone_transformform.translation()
 			smoothPosition = coeffs["smoothing"] * smoothPosition + (1 - coeffs["smoothing"]) * pos
 
-			droneTransform.translation(smoothPosition)
+			drone_transform.translation(smoothPosition)
 
         logging.Debug.debug("found Position")
 
@@ -354,8 +254,8 @@ def main():
     		pid_controllers[index]._kd = coeffs[axis]["d"] / (factor * 10)
 
 		controlErrors = calculateControlErrors(
-            droneTransform.translation(),
-            Mat{droneTransform.rotation()},
+            drone_transform.translation(),
+            drone_transform.rotation(),
             DRONE_TARGET
         )
 
@@ -369,63 +269,38 @@ def main():
 
 		logging.Debug.debug("Take off and Landing")
 
-		channel_controls = controls_to_drone_channels(pid_control)
+		channel_controls = chnnels.controls_to_drone_channels(pid_control)
 		if !flightModeOn:
 			channel_controls = [64, 64, 0, 64]
 
-		if serial.isOpened():
-			# TODO(Andrey): Work with floats instead
-			if devoMode:
-				success = serial.sendDevo(
-					channel_controls[0],
-					channel_controls[1],
-					channel_controls[2],
-					channel_controls[3]
-                )
-			else:
-				success = serial.send(
-					(int(channel_controls[0]) - 64) * 2,
-					(int(channel_controls[1]) - 64) * 2,
-					(int(channel_controls[2]) - 64) * 2,
-					(int(channel_controls[3]) - 64) * 2
-                )
+		if serial.is_opened():
+			success = serial.send([
+				(int(channel_controls[0]) - 64) * 2,
+				(int(channel_controls[1]) - 64) * 2,
+				(int(channel_controls[2]) - 64) * 2,
+				(int(channel_controls[3]) - 64) * 2
+            ])
 
 			if not success:
                 logging.Debug.debug("Failed to send to Arduino")
-			logging.Debug.debug("Send drone actions")
-		}
-
 
 		logging.Debug.debug("Control errors to console")
 
-		#
 		# Draw GUI
-		#
-        if viz_mode:
-			displayed_frame = StepVizData.vizMat.clone()
+		viz.GUI.drawFlightViz(
+            displayedFrame,
+			displayedFrame,
+			drone_transform,
+			59.9,
+			droneTarget,
+			pidControl * 100,
+			flightModeOn
+        )
 
-			if displayedFrame.empty():
-				displayedFrame = Mat{32, 32, CV_8UC3}
-			elif displayedFrame.type() == CV_8U:
-				cv.cvtColor(displayedFrame, displayedFrame, cv.COLOR_GRAY2BGR)
-
-			GUI.drawFlightViz(displayedFrame,
-				displayedFrame,
-				droneTransform,
-				59.9,
-				droneTarget,
-				pidControl * 100,
-				flightModeOn
-            )
-
-			cv.imshow("w", displayedFrame)
-			showFrameRateInTitle("w")
 		logging.Debug.debug("Draw GUI")
 
 		pressedKey = cv.waitKey(1)
-
-		#std.cout << pressedKey << std.endl
-
+        
 		logging.Debug.debug("cv.waitKey(1)")
 
 		if pressedKey == ' ' :
@@ -435,23 +310,14 @@ def main():
         elif pressedKey in [BACK_BUTTON, PI_BACK_BUTTON, 'i']:
 			for pid in pid_controllers:
 				pid._scaled_error_sum = 0
+        elif pressedKey in ['q']:
+            break
+        elif pressedKey == '0':
+            viz.stepViz.displayed_step = 9
+        elif pressedKey >= '1' and pressedKey <= '9':
+            vizstepViz.displayed_step = pressedKey - '1'
 
 		logging.Debug.debug("User Commands")
-
-		#
-		# Prepare StepViz for next cycle
-		#
-        if viz_mode:
-			# stepViz.vizMat.setTo(0xCC)
-
-			if pressedKey == '0':
-				stepViz.displayed_step = 9
-			elif pressedKey >= '1' and pressedKey <= '9':
-				stepViz.displayed_step = pressedKey - '1'
-	return 0
-}
-
-
 
 
 if __name__ == "__main__":

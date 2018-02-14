@@ -1,35 +1,107 @@
+#
+# Written by Roy Zohar, 2017.
+# Published under the MIT license.
+#
+
+import cv2 as cv
+import numpy as np
+
+import logging
+
+
+# frequent colors
+RED = np.array([66, 66, 244])
+GREEN = np.array([66, 244, 66])
+
 class StepVizData(object):
     displayed_step = 0
     current_step = -1
     vizMat                                    # TODO: define as a cv.Mat (np.array)
 
 class GUI(object):
-    def __init__(self):
-        # fps calculations
-        self._frames = 0                        # number of frames
-        self._start = cv.getTickCount()         # set start tickcount
-        self._freq = cv.getTickFrequency()      # set tick frequency
-        self._capture_length = self._freq / 10
+    CONFIG_WINDOW_NAME = "config"
+    MAIN_WINDOW_NAME = "main"
+    DEFAULT_VIZ_MODE = True
+    DEFAULT_CONFIG_MDOE = True
 
-        self._main_window = ""
+    viz_mode = DEFAULT_VIZ_MODE
+    config_mode = DEFAULT_CONFIG_MDOE
 
-    def show_frame_rate(self):
-    	self._freq = static_cast<int>(cv.getTickFrequency())
-    	self._captureLength = self._freq / 10
+    frames = 0                        # number of frames
+    start = cv.getTickCount()         # set start tickcount
+    freq = cv.getTickFrequency()      # set tick frequency
+    capture_length = freq / 10
 
-        # move onto next frame
-    	self._frames++
+    def show_frame_rate():
+        if viz.GUI.viz_mode:
+        	GUI.freq = cv.getTickFrequency()
+        	GUI.capture_length = GUI.freq / 10
 
-        # current tick count
-    	curr = cv.getTickCount()
+            # move onto next frame
+        	GUI.frames++
 
-    	if (curr - start) >= captureLength:
-    		fps = frames * (freq / (curr - start))
-            if VIZStepFunction:
-    			cv.setWindowTitle(window, str(fps))
-            print("FPS:\t" % fps)
-    		self._start = curr
-            self._frames = 0
+            # current tick count
+        	curr = cv.getTickCount()
+
+        	if (curr - start) >= GUI.captureLength:
+        		fps = GUI.frames * (GUI.freq / (curr - GUI.start))
+                if VIZStepFunction:
+        			cv.setWindowTitle(
+                        GUI.MAIN_WINDOW_NAME,
+                        str(fps)
+                    )
+        		GUI.start = curr
+                GUI.frames = 0
+
+    def draw_square(frame, camera_square):
+        if viz.GUI.viz_mode:
+			viz.StepVizData.vizMat = frame.clone()
+			for i in range(len(camera_square)):
+				cv.line(
+                    StepVizData.vizMat,
+                    camera_square[i],
+                    camera_square[(i + 1) % len(camera_square)],
+                    RED if (i == len(camera_square) - 1) else GREEN,
+                    3
+                )
+
+    def trackbar_action(value, coeffs, name):
+        if name == "smoothing":
+            # update the somothing factor
+            coeffs["smoothing"] = value
+        else:
+            # update the trackbars for the pid
+            axis, pid_name = name.split(' ')
+            coeffs["pid"][axis][pid_name] = value
+
+
+    def create_trackbars(coeffs):
+        if GUI.config_mode:
+    		cv.namedWindow(
+                GUI.CONFIG_WINDOW_NAME,
+                cv.WINDOW_NORMAL
+            )
+
+            # create trackbars for pid
+            for axis_name, pid in coeffs["pid"].items():
+                for pid_name, pid_val in pid.items():
+                    trackbar_name = "%s %s" % (axis, pid_name)
+                    cv.createTrackbar(
+                        trackbar_name,
+                        GUI.CONFIG_WINDOW_NAME,
+                        curr_val,
+                        100,
+                        lambda x: GUI.trackbar_action(x, coeffs, trackbar_name)
+                    )
+
+            # create trackbar for smoothing factor
+    		cv.createTrackbar(
+                "Smoothing factor",
+                GUI.CONFIG_WINDOW_NAME,
+                coeffs["smoothing"],
+                100,
+                lambda x: GUI.trackbar_action(x, coeffs, "smoothing")
+            )
 
     def ortho_project(point, camera_matrix):
     	point = camera_matrix * point
@@ -190,4 +262,7 @@ class GUI(object):
     	q2.copyTo(Mat{screenBuffer, Rect2i{panelSize.width + 1, 0, panelSize.width, panelSize.height}})
     	q3.copyTo(Mat{screenBuffer, Rect2i{0, panelSize.height + 1, panelSize.width, panelSize.height}})
     	q4.copyTo(Mat{screenBuffer, Rect2i{panelSize.width + 1, panelSize.height + 1, panelSize.width, panelSize.height}})
+
+        cv.imshow("w", displayedFrame)
+        showFrameRateInTitle("w")
     }
