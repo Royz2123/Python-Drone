@@ -31,12 +31,12 @@ def controls_to_channels(input_vec):
     right_channel = Channel(127-30, 64, 30)
     forward_channel = Channel(0+30, 64, 127-30)
     up_channel = Channel(10, 58, 127)
-    rotate_channel = Channel(127, 64, 0)
+    rotation_channel = Channel(127, 64, 0)
 
     # Note: order isn't a mistake! changed on purpose
     return [
         right_channel.to_channel(input_vec[0]),
         forward_channel.to_channel(input_vec[2]),
         up_channel.to_channel(input_vec[1]),
-        rotation_channel.to_hannel(input_vec[3])
+        rotation_channel.to_channel(input_vec[3])
     ]

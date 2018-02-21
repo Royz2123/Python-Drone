@@ -7,6 +7,7 @@ import cv2 as cv
 import numpy as np
 
 import logging
+import util
 
 
 # frequent colors
@@ -18,6 +19,8 @@ class GUI(object):
     MAIN_WINDOW_NAME = "main"
     DEFAULT_VIZ_MODE = True
     DEFAULT_CONFIG_MDOE = True
+    DEFAULT_GUI_STEP = 2
+    DISPLAY_STEPS = 3
 
     viz_mode = DEFAULT_VIZ_MODE
     config_mode = DEFAULT_CONFIG_MDOE
@@ -27,7 +30,8 @@ class GUI(object):
     freq = cv.getTickFrequency()      # set tick frequency
     capture_length = freq / 10
 
-    current_frame = np.array([])
+    disp_frames = [0,0,0]
+    gui_step = 2
     screen_buffer = []
     windows = []
 
@@ -43,44 +47,59 @@ class GUI(object):
             # current tick count
             curr = cv.getTickCount()
 
-            if (curr - start) >= GUI.captureLength:
+            if (curr - GUI.start) >= GUI.capture_length:
                 fps = GUI.frames * (GUI.freq / (curr - GUI.start))
-                if VIZStepFunction:
-                    cv.setWindowTitle(
-                        GUI.MAIN_WINDOW_NAME,
-                        str(fps)
-                    )
+                cv.setWindowTitle(
+                    GUI.MAIN_WINDOW_NAME,
+                    str(fps)
+                )
                 GUI.start = curr
                 GUI.frames = 0
 
     @staticmethod
-    def copy_frame(src):
+    def copy_frames(src):
         if GUI.viz_mode:
-            GUI.current_frame = np.copy(src)
+            for i in range(GUI.DISPLAY_STEPS):
+                GUI.disp_frames[i] = np.copy(src)
 
 
     @staticmethod
     def draw_square(frame, camera_square):
         if GUI.viz_mode:
-            GUI.current_frame = np.copy(frame)
+            if camera_square is None:
+                return
+
             for i in range(len(camera_square)):
                 cv.line(
-                    GUI.current_frame,
+                    GUI.disp_frames[2],
                     tuple(list(camera_square[i])),
                     tuple(list(camera_square[(i + 1) % len(camera_square)])),
                     (RED if (i == len(camera_square) - 1) else GREEN),
                     thickness=3
                 )
 
+
     @staticmethod
-    def trackbar_action(value, coeffs, name):
-        if name == "smoothing":
-            # update the somothing factor
-            coeffs["smoothing"] = value
-        else:
-            # update the trackbars for the pid
-            axis, pid_name = name.split(' ')
-            coeffs["pid"][axis][pid_name] = value
+    def get_trackbars(coeffs):
+        # if there arent any trackbars
+        if not GUI.config_mode:
+            return coeffs
+
+        # get each trackbar position
+        for axis_name, pid in coeffs["pid"].items():
+            for pid_name, pid_val in pid.items():
+                coeffs["pid"][axis_name][pid_name] = cv.getTrackbarPos(
+                    "%s %s" % (axis_name, pid_name),
+                    GUI.CONFIG_WINDOW_NAME,
+                )
+        coeffs["smoothing"] = cv.getTrackbarPos(
+            "Smoothing factor",
+            GUI.CONFIG_WINDOW_NAME,
+        )
+
+        # return new coefficients
+        return coeffs
+
 
     @staticmethod
     def create_trackbars(coeffs):
@@ -93,13 +112,12 @@ class GUI(object):
             # create trackbars for pid
             for axis_name, pid in coeffs["pid"].items():
                 for pid_name, pid_val in pid.items():
-                    trackbar_name = "%s %s" % (axis_name, pid_name)
                     cv.createTrackbar(
-                        trackbar_name,
+                        "%s %s" % (axis_name, pid_name),
                         GUI.CONFIG_WINDOW_NAME,
                         pid_val,
                         100,
-                        lambda x: GUI.trackbar_action(x, coeffs, trackbar_name)
+                        util.nothing
                     )
 
             # create trackbar for smoothing factor
@@ -108,12 +126,16 @@ class GUI(object):
                 GUI.CONFIG_WINDOW_NAME,
                 coeffs["smoothing"],
                 100,
-                lambda x: GUI.trackbar_action(x, coeffs, "smoothing")
+                util.nothing
             )
 
     @staticmethod
     def simple_flight_viz(flight_mode_on):
-        pass
+        if GUI.gui_step < 0 or GUI.gui_step >= GUI.DISPLAY_STEPS:
+            GUI.gui_step = GUI.DEFAULT_GUI_STEP
+
+        cv.imshow(GUI.MAIN_WINDOW_NAME, GUI.disp_frames[GUI.gui_step])
+        GUI.show_frame_rate()
 
 
 

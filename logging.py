@@ -5,6 +5,7 @@
 
 import cv2 as cv
 import numpy as np
+import time
 
 # class for debugging purposes
 class Debug(object):
@@ -30,3 +31,7 @@ class Debug(object):
                 msg
             ))
             Debug.last = curr
+
+    @staticmethod
+    def pause(sleep_time=1):
+        time.sleep(sleep_time)

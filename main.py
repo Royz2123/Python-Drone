@@ -50,13 +50,13 @@ PI_CAMERA_MAT = np.array([
 
 # world constants
 WORLD_SQUARE_SIZE = 21.0
-WORLD_SQUARE = np.array([
+WORLD_SQUARE = np.float64(np.array([
     [0, 0, 0],
     [0, 0, -WORLD_SQUARE_SIZE],
     [WORLD_SQUARE_SIZE, 0, WORLD_SQUARE_SIZE],
     [WORLD_SQUARE_SIZE, 0, 0]
-])
-DRONE_TARGET = np.array([WORLD_SQUARE_SIZE, 160, -WORLD_SQUARE_SIZE])
+]))
+DRONE_TARGET = np.float64(np.array([WORLD_SQUARE_SIZE, 160, -WORLD_SQUARE_SIZE]))
 
 
 # DEBUGGING constants
@@ -68,7 +68,7 @@ viz.GUI.viz_mode = True
 viz.GUI.config_mode = True
 
 # debug_mode logs everything
-logging.Debug.debug_mode = True
+logging.Debug.debug_mode = False
 
 def main():
     #                                                                             #####
@@ -139,12 +139,13 @@ def main():
     camera_matrix = PI_CAMERA_MAT
 
     camera_square = np.zeros(3)
-    drone_transform = np.zeros(3)
+    drone_translation = np.zeros(3)
+    drone_rotation = np.zeros(3)
     smooth_position = np.zeros(3)
 
     last_frame_tick_count = 0
 
-    flightModeOn = False
+    flight_mode_on = False
     paused = False
     pressedKey = 0
 
@@ -171,6 +172,8 @@ def main():
 
             logging.Debug.debug("TX Mode")
 
+        viz.GUI.copy_frames(frame)
+
         deltaTime = float(cv.getTickCount() - last_frame_tick_count) / cv.getTickFrequency()
         last_frame_tick_count = cv.getTickCount()
 
@@ -179,24 +182,22 @@ def main():
         camera_square = image_processing.ImageProcessing.find_open_square(frame)
         viz.GUI.draw_square(frame, camera_square)
 
-        print(type(camera_square))
-
         logging.Debug.debug("Tracking OpenSquare section")
 
         if camera_square is None:
             logging.Debug.debug("Square not found")
         else:
-            rvec, tvec = cv.solvePnP(
+
+            retval, rvec, tvec = cv.solvePnP(
                 WORLD_SQUARE,
-                camera_square,
+                np.float64(camera_square),
                 camera_matrix,
                 0
             )
 
             logging.Debug.debug("SolvePnP")
 
-            rvec.convertTo(rvec, CV_32F)
-            tvec.convertTo(tvec, CV_32F)
+            """
             camera_transform = np.concatenate((rvec, tvec.T), axis=1)
 
             # The square doesn't move, we are moving.
@@ -206,22 +207,29 @@ def main():
             # TODO: Nnot working drone_transform = camera_transform * INV_DRONE_CAMERA_TRANSFORM
 
             pos = drone_transform.translation()
+            """
+            pos = tvec
+
             smooth_position = coeffs["smoothing"] * smooth_position + (1 - coeffs["smoothing"]) * pos
 
-            drone_transform.translation(smooth_position)
+            drone_translation = smooth_position
+            drone_rotationd = rvec
 
         logging.Debug.debug("found Position")
+
+        # get latest coeffs from trackbars
+        coeffs = viz.GUI.get_trackbars(coeffs)
 
         # update controller coefficients based on trackbar
         for index, axis in enumerate(["xz", "y", "xz", "r"]):
             factor = 1000.0 if (axis != "r") else 100.0
-            pid_controllers[index]._kp = coeffs[axis]["p"] / factor
-            pid_controllers[index]._ki = coeffs[axis]["i"] / (factor * 10)
-            pid_controllers[index]._kd = coeffs[axis]["d"] / (factor * 10)
+            pid_controllers[index]._kp = coeffs["pid"][axis]["p"] / factor
+            pid_controllers[index]._ki = coeffs["pid"][axis]["i"] / (factor * 10)
+            pid_controllers[index]._kd = coeffs["pid"][axis]["d"] / (factor * 10)
 
         controlErrors = util.calculate_control_errors(
-            drone_transform.translation(),
-            drone_transform.rotation(),
+            drone_translation,
+            drone_rotation,
             DRONE_TARGET
         )
 
@@ -229,14 +237,14 @@ def main():
 
         # set pid controls
         pid_control = [0, 0, 0, 0]
-        if found and flightModeOn:
+        if camera_square is not None and flight_mode_on:
             for i in range(4):
                 pid_control.append(pid_controllers[i].calculate(controlErrors[i], deltaTime))
 
         logging.Debug.debug("Take off and Landing")
 
-        channel_controls = chnnels.controls_to_drone_channels(pid_control)
-        if not flightModeOn:
+        channel_controls = channels.controls_to_channels(pid_control)
+        if not flight_mode_on:
             channel_controls = [64, 64, 0, 64]
 
         if serial.is_opened():
@@ -253,35 +261,37 @@ def main():
         logging.Debug.debug("Control errors to console")
 
         # Draw GUI
-        viz.GUI.drawFlightViz(
+        viz.GUI.simple_flight_viz(flight_mode_on)
+
+        """
             displayedFrame,
             displayedFrame,
             drone_transform,
             59.9,
             droneTarget,
             pidControl * 100,
-            flightModeOn
-        )
+            flight_mode_on
+        """
 
         logging.Debug.debug("Draw GUI")
 
-        pressedKey = cv.waitKey(1)
+        pressedKey = cv.waitKey(0)
+        print type(pressedKey)
+        print pressedKey
 
         logging.Debug.debug("cv.waitKey(1)")
 
         if pressedKey == ' ' :
             paused = not paused
-        elif pressedKey in [ENTER. PI_ENTER, 'x']:
-            flightModeOn = not flightModeOn
+        elif pressedKey in [ENTER, PI_ENTER, 'x']:
+            flight_mode_on = not flight_mode_on
         elif pressedKey in [BACK_BUTTON, PI_BACK_BUTTON, 'i']:
             for pid_obj in pid_controllers:
                 pid_obj._scaled_error_sum = 0
         elif pressedKey in ['q']:
             break
-        elif pressedKey == '0':
-            viz.stepViz.displayed_step = 9
-        elif pressedKey >= '1' and pressedKey <= '9':
-            vizstepViz.displayed_step = pressedKey - '1'
+        elif pressedKey >= '0' and pressedKey <= '9':
+            viz.GUI.gui_step = pressedKey - '0'
 
         logging.Debug.debug("User Commands")
 

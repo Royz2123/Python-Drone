@@ -1,3 +1,10 @@
+import numpy as np
+
+
+def nothing(x):
+    pass
+
+
 def is_number(s):
     try:
         int(s)
@@ -12,9 +19,9 @@ def calculate_control_errors(currPos, currRotation, targetPos):
 
     yawRotation  = [0, 1, 0] # TODO: Add yaw * -yawCW}
 
-    droneWorldForward = yawRotation * [0, 0, -1]
-    droneWorldRight = yawRotation * [1, 0, 0]
-    droneWorldUp = yawRotation * [0, 1, 0]
+    droneWorldForward = yawRotation * np.array([0, 0, -1])
+    droneWorldRight = yawRotation * np.array([1, 0, 0])
+    droneWorldUp = yawRotation * np.array([0, 1, 0])
 
     target = targetPos - currPos
 
@@ -22,6 +29,6 @@ def calculate_control_errors(currPos, currRotation, targetPos):
         target.dot(droneWorldRight),
         target.dot(droneWorldUp),
         target.dot(droneWorldForward),
-        0 - yawCW
+        0   # -yawCW
     ]
     return errors
