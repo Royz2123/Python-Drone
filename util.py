@@ -8,20 +8,20 @@ def is_number(s):
 
 
 def calculate_control_errors(currPos, currRotation, targetPos):
-	# yawCW = rotationYaw(currRotation)
+    # yawCW = rotationYaw(currRotation)
 
-	Affine3f yawRotation{Vec3f{0, 1, 0} * -yawCW}
+    Affine3f yawRotation{Vec3f{0, 1, 0} * -yawCW}
 
-	droneWorldForward = yawRotation * [0, 0, -1]
-	droneWorldRight = yawRotation * [1, 0, 0]
-	droneWorldUp = yawRotation * [0, 1, 0]
+    droneWorldForward = yawRotation * [0, 0, -1]
+    droneWorldRight = yawRotation * [1, 0, 0]
+    droneWorldUp = yawRotation * [0, 1, 0]
 
-	target = targetPos - currPos
+    target = targetPos - currPos
 
-	errors = [
+    errors = [
         target.dot(droneWorldRight),
-		target.dot(droneWorldUp),
-		target.dot(droneWorldForward),
-		0 - yawCW
+        target.dot(droneWorldUp),
+        target.dot(droneWorldForward),
+        0 - yawCW
     ]
-	return errors
+    return errors

@@ -16,20 +16,20 @@ class ImageProcessing(object):
 
     @staticmethod
     def binarizeImageInv(src):
-    	logging.Debug.debug("Entered binarizeImageInv")
+        logging.Debug.debug("Entered binarizeImageInv")
 
         src = cv.cvtColor(src, cv.COLOR_BGR2GRAY)
 
-    	logging.Debug.debug("grayscale")
+        logging.Debug.debug("grayscale")
 
-    	ret, src = cv.threshold(
+        ret, src = cv.threshold(
             src,
             cv.mean(dst) - ImageProcessing.THRESHOLD,
             255,
             cv.THRESH_BINARY_INV
         )
 
-    	logging.Debug.debug("binarize (theshohold)")
+        logging.Debug.debug("binarize (theshohold)")
 
 
     #                     ####
@@ -37,10 +37,10 @@ class ImageProcessing(object):
     #                    #  #
     @staticmethod
     def find_open_square(image):
-    	logging.Debug.debug("Entered findOpenSquare")
+        logging.Debug.debug("Entered findOpenSquare")
 
         # cinarize the image
-    	ImageProcessing.binarizeImageInv(image)
+        ImageProcessing.binarizeImageInv(image)
 
         # find the contours
         contours, hierarchy = cv2.findContours(
@@ -49,12 +49,12 @@ class ImageProcessing(object):
             cv.CHAIN_APPROX_SIMPLE
         )
 
-    	logging.Debug.debug("Find conturs")
+        logging.Debug.debug("Find conturs")
 
-    	if not len(contours):
-    		return None
+        if not len(contours):
+            return None
 
-    	# largest area
+        # largest area
         chosen_contour = contours[0]
         max_size = cv.contourArea(chosen_contour)
         for contour in contours:
@@ -63,16 +63,16 @@ class ImageProcessing(object):
                 max_size = curr_size
                 chosen_contour = contour
 
-    	logging.Debug.debug("Largest Area")
+        logging.Debug.debug("Largest Area")
 
-    	# Find bounding square
+        # Find bounding square
         point_list = cv.boxPoints(cv.minAreaRect(chosen_contour))
         point_list = np.int0(point_list)
 
-    	logging.Debug.debug("Find Bounding square")
+        logging.Debug.debug("Find Bounding square")
 
-    	# Reorder square points into CW order
-    	centroid = np.mean(axis=0)
+        # Reorder square points into CW order
+        centroid = np.mean(axis=0)
         point_list.sort(
             key=lambda x : math.atan2(
                 -(x - centroid)[1],
@@ -80,7 +80,7 @@ class ImageProcessing(object):
             )
         )
 
-    	logging.Debug.debug("Reorder points")
+        logging.Debug.debug("Reorder points")
 
         # find the missing edge
         max_dist = -1
@@ -106,6 +106,6 @@ class ImageProcessing(object):
             + point_list[:max_dist_index]
         )
 
-    	logging.Debug.debug("Find missing edge and finish findOpenSquare")
+        logging.Debug.debug("Find missing edge and finish findOpenSquare")
 
-    	return point_list
+        return point_list

@@ -24,9 +24,9 @@ class Debug(object):
     @staticmethod
     def debug_time_spent(msg):
         if Debug.debug_mode:
-        	curr = cv.getTickCount()
+            curr = cv.getTickCount()
             print("%.2f:\t%s" % (
                 float(curr - Debug.last) / freq * 1000,
                 msg
             ))
-        	Debug.last = curr
+            Debug.last = curr

@@ -10,9 +10,9 @@ import logging
 
 class Channel(object):
     def __init__(self, min_val, zero_val, max_val):
-    	self._min = min_val
-    	self._zero = zero_val
-    	self._max = max_val
+        self._min = min_val
+        self._zero = zero_val
+        self._max = max_val
 
 
     # Linear interpolation (continuation)
@@ -36,7 +36,7 @@ def controls_to_channels(input_vec):
     # Note: order isn't a mistake! changed on purpose
     return [
         right_channel.to_channel(input_vec[0]),
-    	forward_channel.to_channel(input_vec[2]),
+        forward_channel.to_channel(input_vec[2]),
         up_channel.to_channel(input_vec[1]),
-    	rotation_channel.to_hannel(input_vec[3])
+        rotation_channel.to_hannel(input_vec[3])
     ]
