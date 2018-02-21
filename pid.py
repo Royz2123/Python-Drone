@@ -9,7 +9,7 @@ import numpy as np
 import logging
 
 class Pid(object):
-    def __init__(self, ki=0, kp=0, kd=0, minIntegral=-1, maxIntegral):
+    def __init__(self, ki=0, kp=0, kd=0, minIntegral=-1, maxIntegral=1):
         self._kp = kp
         self._ki = ki
         self._kd = kd

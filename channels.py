@@ -28,10 +28,10 @@ class Channel(object):
 
 
 def controls_to_channels(input_vec):
-    Channel right_channel = Channel(127-30, 64, 30)
-    Channel forward_channel = Channel(0+30, 64, 127-30)
-    Channel up_channel = Channel(10, 58, 127)
-    Channel rotate_channel = Channel(127, 64, 0)
+    right_channel = Channel(127-30, 64, 30)
+    forward_channel = Channel(0+30, 64, 127-30)
+    up_channel = Channel(10, 58, 127)
+    rotate_channel = Channel(127, 64, 0)
 
     # Note: order isn't a mistake! changed on purpose
     return [

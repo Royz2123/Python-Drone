@@ -10,7 +10,7 @@ def is_number(s):
 def calculate_control_errors(currPos, currRotation, targetPos):
     # yawCW = rotationYaw(currRotation)
 
-    Affine3f yawRotation{Vec3f{0, 1, 0} * -yawCW}
+    yawRotation  = [0, 1, 0] # TODO: Add yaw * -yawCW}
 
     droneWorldForward = yawRotation * [0, 0, -1]
     droneWorldRight = yawRotation * [1, 0, 0]

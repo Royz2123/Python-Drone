@@ -5,6 +5,7 @@
 
 import cv2 as cv
 import numpy as np
+import sys
 
 import channels
 import logging
@@ -45,17 +46,17 @@ PI_CAMERA_MAT = np.array([
     0., 0., 1.
 ]).reshape(3, 3)
 
-INV_DRONE_CAMERA_TRANSFORM = np.array([cv.CV_PI/2, 0, 0]).inv()
+# TODO: Not working INV_DRONE_CAMERA_TRANSFORM = np.linalg.inv(cv.Affine3(np.array([np.pi/2, 0, 0])))
 
 # world constants
 WORLD_SQUARE_SIZE = 21.0
-WORLD_SQUARE = [
+WORLD_SQUARE = np.array([
     [0, 0, 0],
     [0, 0, -WORLD_SQUARE_SIZE],
     [WORLD_SQUARE_SIZE, 0, WORLD_SQUARE_SIZE],
     [WORLD_SQUARE_SIZE, 0, 0]
-]
-DRONE_TARGET = [WORLD_SQUARE_SIZE, 160, -WORLD_SQUARE_SIZE]
+])
+DRONE_TARGET = np.array([WORLD_SQUARE_SIZE, 160, -WORLD_SQUARE_SIZE])
 
 
 # DEBUGGING constants
@@ -106,7 +107,7 @@ def main():
         pid.Pid(0.04, 0, 0),
         pid.Pid(0.06, 0, 0),
         pid.Pid(0.04, 0, 0),
-        pid.Pid(0.3, 0, 0),
+        pid.Pid(0.3, 0, 0)
     ]
     coeffs = {
         "pid" : {
@@ -130,16 +131,16 @@ def main():
         elif util.is_number(temp):
             cameraIndex = int(temp)
 
-    viz.GUI.create_trackbars()
+    viz.GUI.create_trackbars(coeffs)
 
     cap = cv.VideoCapture(cameraIndex)
 
     frame = np.array([])
     camera_matrix = PI_CAMERA_MAT
 
-    cameraSquare = np.zeros(3)
+    camera_square = np.zeros(3)
     drone_transform = np.zeros(3)
-    smoothPosition = np.zeros(3)
+    smooth_position = np.zeros(3)
 
     last_frame_tick_count = 0
 
@@ -175,8 +176,10 @@ def main():
 
         logging.Debug.debug("Time since last frame tick count")
 
-        camera_square = ImageProcessing.find_open_square(frame)
-        viz.GUI.draw_square(frame, cameraSquare)
+        camera_square = image_processing.ImageProcessing.find_open_square(frame)
+        viz.GUI.draw_square(frame, camera_square)
+
+        print(type(camera_square))
 
         logging.Debug.debug("Tracking OpenSquare section")
 
@@ -185,8 +188,9 @@ def main():
         else:
             rvec, tvec = cv.solvePnP(
                 WORLD_SQUARE,
-                cameraSquare,
+                camera_square,
                 camera_matrix,
+                0
             )
 
             logging.Debug.debug("SolvePnP")
@@ -194,17 +198,17 @@ def main():
             rvec.convertTo(rvec, CV_32F)
             tvec.convertTo(tvec, CV_32F)
             camera_transform = np.concatenate((rvec, tvec.T), axis=1)
-            
+
             # The square doesn't move, we are moving.
-            camera_transform = camera_transform.inv()
+            camera_transform = np.linalg.inv(camera_transform)
 
             # We found the camera, but we want to find the drone
-            drone_transform = camera_transform * INV_DRONE_CAMERA_TRANSFORM
+            # TODO: Nnot working drone_transform = camera_transform * INV_DRONE_CAMERA_TRANSFORM
 
             pos = drone_transform.translation()
-            smoothPosition = coeffs["smoothing"] * smoothPosition + (1 - coeffs["smoothing"]) * pos
+            smooth_position = coeffs["smoothing"] * smooth_position + (1 - coeffs["smoothing"]) * pos
 
-            drone_transform.translation(smoothPosition)
+            drone_transform.translation(smooth_position)
 
         logging.Debug.debug("found Position")
 
@@ -270,8 +274,8 @@ def main():
         elif pressedKey in [ENTER. PI_ENTER, 'x']:
             flightModeOn = not flightModeOn
         elif pressedKey in [BACK_BUTTON, PI_BACK_BUTTON, 'i']:
-            for pid in pid_controllers:
-                pid._scaled_error_sum = 0
+            for pid_obj in pid_controllers:
+                pid_obj._scaled_error_sum = 0
         elif pressedKey in ['q']:
             break
         elif pressedKey == '0':

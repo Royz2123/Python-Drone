@@ -13,11 +13,6 @@ import logging
 RED = np.array([66, 66, 244])
 GREEN = np.array([66, 244, 66])
 
-class StepVizData(object):
-    displayed_step = 0
-    current_step = -1
-    vizMat                                    # TODO: define as a cv.Mat (np.array)
-
 class GUI(object):
     CONFIG_WINDOW_NAME = "config"
     MAIN_WINDOW_NAME = "main"
@@ -32,9 +27,9 @@ class GUI(object):
     freq = cv.getTickFrequency()      # set tick frequency
     capture_length = freq / 10
 
-    frame = np.array([])
-    windows = []
+    current_frame = np.array([])
     screen_buffer = []
+    windows = []
 
     @staticmethod
     def show_frame_rate():
@@ -43,7 +38,7 @@ class GUI(object):
             GUI.capture_length = GUI.freq / 10
 
             # move onto next frame
-            GUI.frames++
+            GUI.frames+=1
 
             # current tick count
             curr = cv.getTickCount()
@@ -60,18 +55,21 @@ class GUI(object):
 
     @staticmethod
     def copy_frame(src):
+        if GUI.viz_mode:
+            GUI.current_frame = np.copy(src)
+
 
     @staticmethod
     def draw_square(frame, camera_square):
         if GUI.viz_mode:
-            viz.StepVizData.vizMat = frame.clone()
+            GUI.current_frame = np.copy(frame)
             for i in range(len(camera_square)):
                 cv.line(
-                    StepVizData.vizMat,
-                    camera_square[i],
-                    camera_square[(i + 1) % len(camera_square)],
-                    RED if (i == len(camera_square) - 1) else GREEN,
-                    3
+                    GUI.current_frame,
+                    tuple(list(camera_square[i])),
+                    tuple(list(camera_square[(i + 1) % len(camera_square)])),
+                    (RED if (i == len(camera_square) - 1) else GREEN),
+                    thickness=3
                 )
 
     @staticmethod
@@ -95,11 +93,11 @@ class GUI(object):
             # create trackbars for pid
             for axis_name, pid in coeffs["pid"].items():
                 for pid_name, pid_val in pid.items():
-                    trackbar_name = "%s %s" % (axis, pid_name)
+                    trackbar_name = "%s %s" % (axis_name, pid_name)
                     cv.createTrackbar(
                         trackbar_name,
                         GUI.CONFIG_WINDOW_NAME,
-                        curr_val,
+                        pid_val,
                         100,
                         lambda x: GUI.trackbar_action(x, coeffs, trackbar_name)
                     )

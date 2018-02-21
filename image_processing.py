@@ -5,6 +5,7 @@
 
 import cv2 as cv
 import numpy as np
+import math
 
 import logging
 
@@ -15,21 +16,25 @@ class ImageProcessing(object):
 
 
     @staticmethod
-    def binarizeImageInv(src):
+    def binarizeImageInv(image):
         logging.Debug.debug("Entered binarizeImageInv")
 
-        src = cv.cvtColor(src, cv.COLOR_BGR2GRAY)
+        image = cv.cvtColor(image, cv.COLOR_BGR2GRAY)
 
         logging.Debug.debug("grayscale")
 
-        ret, src = cv.threshold(
-            src,
-            cv.mean(dst) - ImageProcessing.THRESHOLD,
+        ret, image = cv.threshold(
+            image,
+            np.mean(image) - ImageProcessing.THRESHOLD,
             255,
             cv.THRESH_BINARY_INV
         )
 
+        image = cv.convertScaleAbs(image)
+
         logging.Debug.debug("binarize (theshohold)")
+
+        return image
 
 
     #                     ####
@@ -40,10 +45,10 @@ class ImageProcessing(object):
         logging.Debug.debug("Entered findOpenSquare")
 
         # cinarize the image
-        ImageProcessing.binarizeImageInv(image)
+        image = ImageProcessing.binarizeImageInv(image)
 
         # find the contours
-        contours, hierarchy = cv2.findContours(
+        im2, contours, hierarchy = cv.findContours(
             image,
             cv.RETR_TREE,
             cv.CHAIN_APPROX_SIMPLE
@@ -72,8 +77,8 @@ class ImageProcessing(object):
         logging.Debug.debug("Find Bounding square")
 
         # Reorder square points into CW order
-        centroid = np.mean(axis=0)
-        point_list.sort(
+        centroid = np.mean(point_list, axis=0)
+        list(point_list).sort(
             key=lambda x : math.atan2(
                 -(x - centroid)[1],
                 (x - centroid)[0]
@@ -81,6 +86,8 @@ class ImageProcessing(object):
         )
 
         logging.Debug.debug("Reorder points")
+
+
 
         # find the missing edge
         max_dist = -1
@@ -92,7 +99,7 @@ class ImageProcessing(object):
             ) / 2
 
             min_dist = min([
-                np.linalg.norm(midpoint - point)
+                np.linalg.norm(mid_point - point)
                 for point in chosen_contour
             ])
 
@@ -100,11 +107,9 @@ class ImageProcessing(object):
                 max_dist = min_dist
                 max_dist_index = point_index
 
+
         # rotate by max_dist_index
-        point_list = (
-            point_list[max_dist_index:]
-            + point_list[:max_dist_index]
-        )
+        np.roll(point_list, max_dist_index)
 
         logging.Debug.debug("Find missing edge and finish findOpenSquare")
 

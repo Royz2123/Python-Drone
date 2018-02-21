@@ -29,5 +29,5 @@ class QuadSerial(object):
 
     # write to serial
     def write(self, cmnds):
-        if self._serial is not None
+        if self._serial is not None:
             self._serial.write([0xff] + cmnds + [0, 0, 0])
