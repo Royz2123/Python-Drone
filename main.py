@@ -12,6 +12,7 @@ import pid
 import quad_serial
 import image_processing
 import viz
+import util
 
 # Raspberry Camera module, not completely necessary
 # include <raspicam/raspicam_cv.h>
@@ -68,46 +69,6 @@ viz.GUI.config_mode = True
 # debug_mode logs everything
 logging.Debug.debug_mode = True
 
-
-def rotationYaw(rotation):
-	zx = rotation.at<float>(0, 2)
-	zz = rotation.at<float>(2, 2)
-	atanY = zx
-	atanX = zz
-
-	yawCCW = std.atan2(atanY, atanX)
-
-	return -yawCCW
-
-
-def calculateControlErrors(currPos, currRotation, targetPos):
-	yawCW = rotationYaw(currRotation)
-
-	Affine3f yawRotation{Vec3f{0, 1, 0} * -yawCW}
-
-	droneWorldForward = yawRotation * Vec3f{0, 0, -1}
-	droneWorldRight = yawRotation * Vec3f{1, 0, 0}
-	droneWorldUp = yawRotation * Vec3f{0, 1, 0}
-
-	target = targetPos - currPos
-
-	errors = [
-        target.dot(droneWorldRight),
-		target.dot(droneWorldUp),
-		target.dot(droneWorldForward),
-		0 - yawCW
-    ]
-	return errors
-
-
-def is_number(s):
-    try:
-        int(s)
-        return True
-    except ValueError:
-        return False
-
-
 def main():
 	#                                                                             #####
 	# In Pattern mode, the drone stabilizes above a black pattern that looks like #   #
@@ -120,28 +81,28 @@ def main():
 	#
     txMode = False
 
-	#
-	# DEVO mode is for the older remotes that use a physical Walkera DEVO
-	# drone controller. Leave this off of the small new remotes.
-	#
-	devoMode = False
+    #
+    # DEVO mode is for the older remotes that use a physical Walkera DEVO
+    # drone controller. Leave this off of the small new remotes.
+    #
+    devoMode = False
 
-	#
-	# If we are running on a respberry computer,
-	# we have the camera interface to grab photos from the RaspberryCam.
-	#
-	berryMode = False
+    #
+    # If we are running on a respberry computer,
+    # we have the camera interface to grab photos from the RaspberryCam.
+    #
+    berryMode = False
 
 	#
 	# Images on RaspberryCam are too big,
-	# we need to scale them down.
-	#
-	scaleFactor = 1.0
+    # we need to scale them down.
+    #
+    scaleFactor = 1.0
 
     # create a quad serial object
-	serial = quad_serial.QuadSerial()
+    serial = quad_serial.QuadSerial()
 
-	pid_controllers = [
+    pid_controllers = [
 		pid.Pid(0.04, 0, 0),
 		pid.Pid(0.06, 0, 0),
 		pid.Pid(0.04, 0, 0),
@@ -156,7 +117,7 @@ def main():
         "smoothing" : 40
     }
 
-	cameraIndex = 0
+    cameraIndex = 0
 
     # handle arguments
 	for arg in sys.argv[1:]:
@@ -166,7 +127,7 @@ def main():
 			berryMode = True
 		elif temp == "-nconfig":
 			viz.GUI.config_mode = False
-		elif is_number(temp):
+		elif util.is_number(temp):
             cameraIndex = int(temp)
 
     viz.GUI.create_trackbars()
@@ -253,7 +214,7 @@ def main():
     		pid_controllers[index]._ki = coeffs[axis]["i"] / (factor * 10)
     		pid_controllers[index]._kd = coeffs[axis]["d"] / (factor * 10)
 
-		controlErrors = calculateControlErrors(
+		controlErrors = util.calculate_control_errors(
             drone_transform.translation(),
             drone_transform.rotation(),
             DRONE_TARGET
@@ -300,7 +261,7 @@ def main():
 		logging.Debug.debug("Draw GUI")
 
 		pressedKey = cv.waitKey(1)
-        
+
 		logging.Debug.debug("cv.waitKey(1)")
 
 		if pressedKey == ' ' :

@@ -32,8 +32,13 @@ class GUI(object):
     freq = cv.getTickFrequency()      # set tick frequency
     capture_length = freq / 10
 
+    frame = np.array([])
+    windows = []
+    screen_buffer = []
+
+    @staticmethod
     def show_frame_rate():
-        if viz.GUI.viz_mode:
+        if GUI.viz_mode:
         	GUI.freq = cv.getTickFrequency()
         	GUI.capture_length = GUI.freq / 10
 
@@ -53,8 +58,12 @@ class GUI(object):
         		GUI.start = curr
                 GUI.frames = 0
 
+    @staticmethod
+    def copy_frame(src):
+
+    @staticmethod
     def draw_square(frame, camera_square):
-        if viz.GUI.viz_mode:
+        if GUI.viz_mode:
 			viz.StepVizData.vizMat = frame.clone()
 			for i in range(len(camera_square)):
 				cv.line(
@@ -65,6 +74,7 @@ class GUI(object):
                     3
                 )
 
+    @staticmethod
     def trackbar_action(value, coeffs, name):
         if name == "smoothing":
             # update the somothing factor
@@ -74,7 +84,7 @@ class GUI(object):
             axis, pid_name = name.split(' ')
             coeffs["pid"][axis][pid_name] = value
 
-
+    @staticmethod
     def create_trackbars(coeffs):
         if GUI.config_mode:
     		cv.namedWindow(
@@ -102,6 +112,24 @@ class GUI(object):
                 100,
                 lambda x: GUI.trackbar_action(x, coeffs, "smoothing")
             )
+
+    @staticmethod
+    def simple_flight_viz(flight_mode_on):
+        pass
+
+
+
+
+"""
+    def rotation_yaw(rotation):
+    	zx = rotation.at<float>(0, 2)
+    	zz = rotation.at<float>(2, 2)
+    	atanY = zx
+    	atanX = zz
+
+    	yawCCW = std.atan2(atanY, atanX)
+
+    	return -yawCCW
 
     def ortho_project(point, camera_matrix):
     	point = camera_matrix * point
@@ -266,3 +294,4 @@ class GUI(object):
         cv.imshow("w", displayedFrame)
         showFrameRateInTitle("w")
     }
+"""
